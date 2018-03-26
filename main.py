@@ -44,7 +44,7 @@ def load_vgg(sess, vgg_path):
     layer3_out = graph.get_tensor_by_name(vgg_layer3_out_tensor_name)
     layer4_out = graph.get_tensor_by_name(vgg_layer4_out_tensor_name)
     layer7_out = graph.get_tensor_by_name(vgg_layer7_out_tensor_name)
-    
+
     return image_input, keep_prob, layer3_out, layer4_out, layer7_out
 tests.test_load_vgg(load_vgg, tf)
 
@@ -58,10 +58,32 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     :param num_classes: Number of classes to classify
     :return: The Tensor for the last layer of output
     """
-    # TODO: Implement function
-
+    # TODO: Implement function 
+    kernel_size_1x1 = 1
+    stride = 1
+    conv_1x1_layer7 = tf.layers.conv2d(vgg_layer7_out, num_classes, kernel_size_1x1, strides = 1)
     
-    return None
+    #Can't add two tensors of different depths. Since the upsampling has num_classes,
+    #we need an extra step to reduce the num_classes from vgg layers to num_classes.
+    conv_1x1_layer4 = tf.layers.conv2d(vgg_layer4_out, num_classes, kernel_size_1x1, strides = 1)
+    conv_1x1_layer3 = tf.layers.conv2d(vgg_layer3_out, num_classes, kernel_size_1x1, strides = 1)
+    
+    upsampled_7 = tf.layers.conv2d_transpose(conv_1x1_layer7, num_classes, 4, strides=2)
+    skip_4_7up = tf.add(conv_1x1_layer4, upsampled_7)
+    
+    upsampled_4 = tf.layers.conv2d_transpose(skip_4_7up, num_classes, 2, strides=2)
+    skip_3_4up = tf.add(conv_1x1_layer3, upsampled_4)
+    
+    output = tf.layers.conv2d_transpose(skip_4_7up, num_classes, 8, strides=8)
+    
+    
+    print("vgg3", vgg_layer3_out.get_shape())
+    print("conv_1x1_3", conv_1x1_layer3.get_shape())
+    print("vgg4", vgg_layer4_out.get_shape())
+    print("conv_1x1_4", conv_1x1_layer4.get_shape())
+    print("vgg7", vgg_layer7_out.get_shape())
+    print("conv_1x1_7", conv_1x1_layer7.get_shape())
+    return output
 tests.test_layers(layers)
 
 
