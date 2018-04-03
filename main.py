@@ -127,7 +127,7 @@ tests.test_train_nn(train_nn)
 
 def run():
     num_classes = 2
-    epochs = 10
+    epochs = 20
     batch_size = 16
     
     #learning_rate = 0.005
@@ -164,7 +164,7 @@ def run():
              correct_label, vgg_keep_prob, learning_rate)
 
         # Save inference data using helper.save_inference_samples
-        helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image)
+        helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, vgg_keep_prob, image_input)
 
         # OPTIONAL: Apply the trained model to a video
 
