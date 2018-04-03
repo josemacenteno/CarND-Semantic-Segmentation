@@ -46,7 +46,7 @@ def load_vgg(sess, vgg_path):
     layer7_out = graph.get_tensor_by_name(vgg_layer7_out_tensor_name)
 
     return image_input, keep_prob, layer3_out, layer4_out, layer7_out
-tests.test_load_vgg(load_vgg, tf)
+#tests.test_load_vgg(load_vgg, tf)
 
 
 def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
@@ -58,23 +58,24 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     :param num_classes: Number of classes to classify
     :return: The Tensor for the last layer of output
     """
-    # TODO: Implement function 
-    kernel_size_1x1 = 1
+    # Implement function 
+    kernel_size_1x1 = 3
     stride = 1
-    conv_1x1_layer7 = tf.layers.conv2d(vgg_layer7_out, num_classes, kernel_size_1x1, strides = 1)
+    conv_1x1_layer7 = tf.layers.conv2d(vgg_layer7_out, num_classes, kernel_size_1x1, strides = 1, padding = 'SAME')
     
     #Can't add two tensors of different depths. Since the upsampling has num_classes,
     #we need an extra step to reduce the num_classes from vgg layers to num_classes.
-    conv_1x1_layer4 = tf.layers.conv2d(vgg_layer4_out, num_classes, kernel_size_1x1, strides = 1)
-    conv_1x1_layer3 = tf.layers.conv2d(vgg_layer3_out, num_classes, kernel_size_1x1, strides = 1)
+    conv_1x1_layer4 = tf.layers.conv2d(vgg_layer4_out, num_classes, kernel_size_1x1, strides = 1, padding = 'SAME')
+    conv_1x1_layer3 = tf.layers.conv2d(vgg_layer3_out, num_classes, kernel_size_1x1, strides = 1, padding = 'SAME')
     
-    upsampled_7 = tf.layers.conv2d_transpose(conv_1x1_layer7, num_classes, 4, strides=2)
+    upsampled_7 = tf.layers.conv2d_transpose(conv_1x1_layer7, num_classes, 3, strides=2, padding = 'SAME',)
     skip_4_7up = tf.add(conv_1x1_layer4, upsampled_7)
     
-    upsampled_4 = tf.layers.conv2d_transpose(skip_4_7up, num_classes, 2, strides=2)
+    upsampled_4 = tf.layers.conv2d_transpose(skip_4_7up, num_classes, 3, strides=2, padding = 'SAME',)
     skip_3_4up = tf.add(conv_1x1_layer3, upsampled_4)
     
-    output = tf.layers.conv2d_transpose(skip_4_7up, num_classes, 8, strides=8)
+    output = tf.layers.conv2d_transpose(skip_4_7up, num_classes, 17, strides=16, padding = 'SAME',)
+    #output_p = tf.Print(output, [tf.shape(output), tf.shape(vgg_layer3_out), tf.shape(vgg_layer4_out), tf.shape(vgg_layer7_out) ])
 
     return output
 tests.test_layers(layers)
@@ -118,7 +119,7 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
     print()
     for epoch_index in range(epochs):
         for images, targets in get_batches_fn(batch_size):
-            _, loss = sess.run([train_op, cross_entropy_loss], feed_dict = {input_image: images, correct_label:targets, keep_prob:0.85, learning_rate:0.005})
+            _, loss = sess.run([train_op, cross_entropy_loss], feed_dict = {input_image: images, correct_label:targets, keep_prob:0.80, learning_rate:0.001})
             print("epoch #", epoch_index, "\t", "cross_entropy_loss:", loss)
     
 tests.test_train_nn(train_nn)
@@ -126,8 +127,8 @@ tests.test_train_nn(train_nn)
 
 def run():
     num_classes = 2
-    epochs = 2
-    batch_size = 1
+    epochs = 10
+    batch_size = 16
     
     #learning_rate = 0.005
     image_shape = (160, 576)
@@ -158,11 +159,11 @@ def run():
         nn_last_layer = layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes)
         logits, train_op, cross_entropy_loss = optimize(nn_last_layer, correct_label, learning_rate, num_classes)
 
-        # TODO: Train NN using the train_nn function
+        # Train NN using the train_nn function
         train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_loss, image_input,
              correct_label, vgg_keep_prob, learning_rate)
 
-        # TODO: Save inference data using helper.save_inference_samples
+        # Save inference data using helper.save_inference_samples
         helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image)
 
         # OPTIONAL: Apply the trained model to a video
