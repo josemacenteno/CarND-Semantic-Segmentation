@@ -46,11 +46,21 @@ def load_vgg(sess, vgg_path):
     layer7_out = graph.get_tensor_by_name(vgg_layer7_out_tensor_name)
 
     return image_input, keep_prob, layer3_out, layer4_out, layer7_out
-#tests.test_load_vgg(load_vgg, tf)
+tests.test_load_vgg(load_vgg, tf)
 
+def conv_1x1(input_layer, num_classes, kernel_size=3, strides = 1, padding = 'SAME',
+             kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3),
+             kernel_initializer=tf.truncated_normal_initializer(stddev=0.01)):
+    return tf.layers.conv2d(input_layer, 
+                            num_classes, 
+                            kernel_size,  
+                            strides = strides,  
+                            padding = padding,  
+                            kernel_regularizer=kernel_regularizer,  
+                            kernel_initializer=kernel_initializer)
 
 def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
-    """
+    """,
     Create the layers for a fully convolutional network.  Build skip-layers using the vgg layers.
     :param vgg_layer3_out: TF Tensor for VGG Layer 3 output
     :param vgg_layer4_out: TF Tensor for VGG Layer 4 output
@@ -58,24 +68,25 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     :param num_classes: Number of classes to classify
     :return: The Tensor for the last layer of output
     """
+    upsample_common_params = {"padding":'SAME', 
+             "kernel_regularizer":tf.contrib.layers.l2_regularizer(1e-3),
+             "kernel_initializer":tf.truncated_normal_initializer(stddev=0.01)}
+    
     # Implement function 
-    kernel_size_1x1 = 3
-    stride = 1
-    conv_1x1_layer7 = tf.layers.conv2d(vgg_layer7_out, num_classes, kernel_size_1x1, strides = 1, padding = 'SAME')
+    conv_1x1_layer7 = conv_1x1(vgg_layer7_out, num_classes)
     
     #Can't add two tensors of different depths. Since the upsampling has num_classes,
     #we need an extra step to reduce the num_classes from vgg layers to num_classes.
-    conv_1x1_layer4 = tf.layers.conv2d(vgg_layer4_out, num_classes, kernel_size_1x1, strides = 1, padding = 'SAME')
-    conv_1x1_layer3 = tf.layers.conv2d(vgg_layer3_out, num_classes, kernel_size_1x1, strides = 1, padding = 'SAME')
+    conv_1x1_layer4 = conv_1x1(vgg_layer4_out, num_classes)
+    conv_1x1_layer3 = conv_1x1(vgg_layer3_out, num_classes)
     
-    upsampled_7 = tf.layers.conv2d_transpose(conv_1x1_layer7, num_classes, 3, strides=2, padding = 'SAME',)
+    upsampled_7 = tf.layers.conv2d_transpose(conv_1x1_layer7, num_classes, 5, strides=2, **upsample_common_params)
     skip_4_7up = tf.add(conv_1x1_layer4, upsampled_7)
     
-    upsampled_4 = tf.layers.conv2d_transpose(skip_4_7up, num_classes, 3, strides=2, padding = 'SAME',)
+    upsampled_4 = tf.layers.conv2d_transpose(skip_4_7up, num_classes, 5, strides=2, **upsample_common_params)
     skip_3_4up = tf.add(conv_1x1_layer3, upsampled_4)
     
-    output = tf.layers.conv2d_transpose(skip_4_7up, num_classes, 17, strides=16, padding = 'SAME',)
-    #output_p = tf.Print(output, [tf.shape(output), tf.shape(vgg_layer3_out), tf.shape(vgg_layer4_out), tf.shape(vgg_layer7_out) ])
+    output = tf.layers.conv2d_transpose(skip_4_7up, num_classes, 17, strides=16, **upsample_common_params)
 
     return output
 tests.test_layers(layers)
@@ -93,7 +104,8 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     logits = tf.reshape(nn_last_layer, (-1, num_classes))
     cross_entropy_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits = logits, labels = correct_label))
     optimizer = tf.train.AdamOptimizer(learning_rate = learning_rate)
-    train_op = optimizer.minimize(cross_entropy_loss)
+    reg_ws = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
+    train_op = optimizer.minimize(cross_entropy_loss + tf.reduce_sum(reg_ws))
     return logits, train_op, cross_entropy_loss
 tests.test_optimize(optimize)
 
@@ -119,7 +131,7 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
     print()
     for epoch_index in range(epochs):
         for images, targets in get_batches_fn(batch_size):
-            _, loss = sess.run([train_op, cross_entropy_loss], feed_dict = {input_image: images, correct_label:targets, keep_prob:0.80, learning_rate:0.001})
+            _, loss = sess.run([train_op, cross_entropy_loss], feed_dict = {input_image: images, correct_label:targets, keep_prob:0.80, learning_rate:0.0001})
             print("epoch #", epoch_index, "\t", "cross_entropy_loss:", loss)
     
 tests.test_train_nn(train_nn)
@@ -127,8 +139,8 @@ tests.test_train_nn(train_nn)
 
 def run():
     num_classes = 2
-    epochs = 20
-    batch_size = 16
+    epochs = 10
+    batch_size = 8
     
     #learning_rate = 0.005
     image_shape = (160, 576)
